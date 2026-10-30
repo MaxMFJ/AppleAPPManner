@@ -1,0 +1,11 @@
+.DS_Store
+.build/
+.swiftpm/
+DerivedData/
+*.xcuserstate
+**/xcuserdata/
+
+# Antahonist's license allows compiled app use but forbids sharing asset files.
+# Install these locally with scripts/install-office-art.sh before building.
+Resources/Iso*.png
+Resources/OfficeFurniture.png
