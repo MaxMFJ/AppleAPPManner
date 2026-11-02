@@ -21,6 +21,32 @@ final class OfficeScene: SKScene {
     private var lastLayoutSize: CGSize = .zero
     private var newArrivalKeys: Set<String> = []
 
+    private struct RoomGeometry {
+        let center: CGPoint
+        let halfWidth: CGFloat
+        let halfHeight: CGFloat
+        let wallHeight: CGFloat
+        let furnitureScale: CGFloat
+
+        init(_ size: CGSize) {
+            center = CGPoint(x: size.width / 2, y: size.height * 0.415)
+            halfWidth = size.width * 0.45
+            halfHeight = size.height * 0.405
+            wallHeight = size.height * 0.16
+            furnitureScale = min(1, halfWidth / 560, halfHeight / 225)
+        }
+
+        var back: CGPoint { CGPoint(x: center.x, y: center.y + halfHeight) }
+        var left: CGPoint { CGPoint(x: center.x - halfWidth, y: center.y) }
+        var right: CGPoint { CGPoint(x: center.x + halfWidth, y: center.y) }
+        var front: CGPoint { CGPoint(x: center.x, y: center.y - halfHeight) }
+
+        func point(u: CGFloat, v: CGFloat) -> CGPoint {
+            CGPoint(x: back.x + u * (left.x - back.x) + v * (right.x - back.x),
+                    y: back.y + u * (left.y - back.y) + v * (right.y - back.y))
+        }
+    }
+
     /// Geometry is authored around a shared desk origin. Keeping these anchors together
     /// prevents the chair, sitter and keyboard drifting independently during layout edits.
     private struct WorkstationAnchors {
@@ -29,15 +55,16 @@ final class OfficeScene: SKScene {
         let sitter: CGPoint
         let monitor: CGPoint
         let keyboard: CGPoint
+        let facingRight: Bool
 
-        init(center: CGPoint) {
-            desk = CGPoint(x: center.x + 3, y: center.y - 5)
-            chair = CGPoint(x: center.x - 15, y: center.y - 20)
-            keyboard = CGPoint(x: center.x + 5, y: center.y - 10)
-            monitor = CGPoint(x: center.x + 10, y: center.y + 20)
-            // At 1.5x, the sitter's pelvis (14, 7) maps to the chair center and
-            // typing hands (26, 15) land on the keyboard center.
-            sitter = CGPoint(x: chair.x + (16 - 14) * 1.5, y: chair.y + (16 - 7) * 1.5)
+        init(center: CGPoint, facingRight: Bool, scale: CGFloat) {
+            let direction: CGFloat = facingRight ? 1 : -1
+            self.facingRight = facingRight
+            desk = CGPoint(x: center.x, y: center.y - 5 * scale)
+            chair = CGPoint(x: center.x - direction * 37 * scale, y: center.y - 29 * scale)
+            keyboard = CGPoint(x: center.x + direction * 12 * scale, y: center.y + 3 * scale)
+            monitor = CGPoint(x: center.x + direction * 23 * scale, y: center.y + 30 * scale)
+            sitter = CGPoint(x: chair.x + direction * 9 * scale, y: chair.y + 29 * scale)
         }
     }
 
@@ -91,157 +118,148 @@ final class OfficeScene: SKScene {
     }
 
     private func drawRoomShell() {
-        // Deep shadow under the cutaway office makes the floor read as a little diorama.
-        let shadow = polygon([
-            CGPoint(x: size.width * 0.5, y: 12), CGPoint(x: size.width - 16, y: size.height * 0.49),
-            CGPoint(x: size.width * 0.5, y: size.height - 30), CGPoint(x: 16, y: size.height * 0.49)
-        ], fill: rgb(0x17111B), stroke: rgb(0x332638), width: 5)
-        room.addChild(shadow)
-
-        // Two cutaway walls, with dark skirting, warm upper light and pixel-like wall panels.
-        let backY = size.height * 0.66
-        let leftWall = polygon([
-            CGPoint(x: 18, y: size.height * 0.48), CGPoint(x: size.width * 0.5, y: backY + size.height * 0.28),
-            CGPoint(x: size.width * 0.5, y: backY - 4), CGPoint(x: 18, y: size.height * 0.2)
-        ], fill: rgb(0x242034), stroke: rgb(0x49324A), width: 2)
-        let rightWall = polygon([
-            CGPoint(x: size.width * 0.5, y: backY + size.height * 0.28), CGPoint(x: size.width - 18, y: size.height * 0.48),
-            CGPoint(x: size.width - 18, y: size.height * 0.2), CGPoint(x: size.width * 0.5, y: backY - 4)
-        ], fill: rgb(0x30283B), stroke: rgb(0x594052), width: 2)
+        let g = RoomGeometry(size)
+        let raised = { (point: CGPoint) in CGPoint(x: point.x, y: point.y + g.wallHeight) }
+        let leftWall = polygon([g.left, g.back, raised(g.back), raised(g.left)], fill: rgb(0x292333), stroke: rgb(0x5A4050), width: 3)
+        let rightWall = polygon([g.back, g.right, raised(g.right), raised(g.back)], fill: rgb(0x33283B), stroke: rgb(0x634853), width: 3)
+        leftWall.zPosition = 2; rightWall.zPosition = 2
         room.addChild(leftWall); room.addChild(rightWall)
 
-        // Warm windows on the left wall.
-        for i in 0..<3 {
-            let t = CGFloat(i)
-            let x = size.width * (0.10 + t * 0.115)
-            let y = size.height * (0.46 + t * 0.065)
-            addRect(CGRect(x: x, y: y, width: size.width * 0.065, height: size.height * 0.20), color: rgb(0xF5C66F), z: 3)
-            addRect(CGRect(x: x + 4, y: y + 4, width: size.width * 0.065 - 8, height: size.height * 0.20 - 8), color: rgb(0xFFE5A0), z: 4)
-            addRect(CGRect(x: x + 5, y: y + size.height * 0.09, width: size.width * 0.065 - 10, height: 3), color: rgb(0xD5924E), z: 5)
-            addRect(CGRect(x: x + size.width * 0.032, y: y + 5, width: 3, height: size.height * 0.20 - 10), color: rgb(0xD5924E), z: 5)
+        // Windows are projected onto the sloping wall, sharing its base edge.
+        for (start, end) in [(0.17, 0.32), (0.48, 0.63)] {
+            let p = interpolate(g.left, g.back, CGFloat(start))
+            let q = interpolate(g.left, g.back, CGFloat(end))
+            let bottom = g.wallHeight * 0.18, top = g.wallHeight * 0.86
+            let frame = polygon([
+                CGPoint(x: p.x, y: p.y + bottom), CGPoint(x: q.x, y: q.y + bottom),
+                CGPoint(x: q.x, y: q.y + top), CGPoint(x: p.x, y: p.y + top)
+            ], fill: rgb(0x9C643E), stroke: rgb(0x4B2D2B), width: 3)
+            frame.zPosition = 3; room.addChild(frame)
+            let glass = polygon([
+                CGPoint(x: p.x + 5, y: p.y + bottom + 5), CGPoint(x: q.x - 5, y: q.y + bottom + 5),
+                CGPoint(x: q.x - 5, y: q.y + top - 5), CGPoint(x: p.x + 5, y: p.y + top - 5)
+            ], fill: rgb(0xFFE3A2), stroke: rgb(0xE6AF68), width: 1)
+            glass.zPosition = 3.1; room.addChild(glass)
+            let mullionX = (p.x + q.x) / 2
+            let mullion = polygon([
+                CGPoint(x: mullionX - 2, y: (p.y + q.y) / 2 + bottom + 4),
+                CGPoint(x: mullionX + 2, y: (p.y + q.y) / 2 + bottom + 4),
+                CGPoint(x: mullionX + 2, y: (p.y + q.y) / 2 + top - 4),
+                CGPoint(x: mullionX - 2, y: (p.y + q.y) / 2 + top - 4)
+            ], fill: rgb(0xA96D48), stroke: .clear, width: 0)
+            mullion.zPosition = 3.2; room.addChild(mullion)
         }
-        // Bookshelves and a framed board on the far wall.
-        drawBookshelf(at: CGPoint(x: size.width * 0.70, y: size.height * 0.78), width: size.width * 0.17, height: size.height * 0.23)
-        drawBookshelf(at: CGPoint(x: size.width * 0.88, y: size.height * 0.66), width: size.width * 0.10, height: size.height * 0.20)
-        drawNoticeBoard(at: CGPoint(x: size.width * 0.48, y: size.height * 0.83), width: size.width * 0.16, height: size.height * 0.11)
+        let boardBase = interpolate(g.back, g.right, 0.34)
+        drawNoticeBoard(at: CGPoint(x: boardBase.x - 15, y: boardBase.y + g.wallHeight * 0.36), width: 135 * g.furnitureScale, height: 43 * g.furnitureScale)
     }
 
     private func drawFloor() {
-        let width = size.width * 0.86
-        let height = size.height * 0.55
-        let center = CGPoint(x: size.width / 2, y: size.height * 0.43)
-        let floor = polygon([
-            CGPoint(x: center.x, y: center.y + height / 2), CGPoint(x: center.x + width / 2, y: center.y),
-            CGPoint(x: center.x, y: center.y - height / 2), CGPoint(x: center.x - width / 2, y: center.y)
-        ], fill: rgb(0xB87A43), stroke: rgb(0x4B2B25), width: 4)
-        room.addChild(floor)
-
-        let cols = 12, rows = 8
-        let tileW = width / CGFloat(cols + rows) * 2
-        let tileH = tileW * 0.5
-        for row in 0..<rows {
-            for col in 0..<cols {
-                let x = center.x + (CGFloat(col - row) - CGFloat(cols - rows) / 2) * tileW / 2
-                let y = center.y + (CGFloat(cols + rows - 2 - col - row) - CGFloat(cols + rows) / 2) * tileH / 2
-                let path = diamond(width: tileW, height: tileH)
-                let tile = SKShapeNode(path: path)
-                tile.position = CGPoint(x: x, y: y)
-                let colors: [UInt32] = [0xE8B86F, 0xDCA45F, 0xF0C77D, 0xCC9252]
-                tile.fillColor = rgb(colors[(row + col) % colors.count])
-                tile.strokeColor = rgb(0xA96E43)
-                tile.lineWidth = 1
-                tile.isAntialiased = false
-                tile.zPosition = 1
-                room.addChild(tile)
+        let g = RoomGeometry(size)
+        let floor = polygon([g.back, g.right, g.front, g.left], fill: rgb(0xB87A43), stroke: rgb(0x4B2B25), width: 5)
+        floor.zPosition = 1; room.addChild(floor)
+        let divisions = 10
+        for row in 0..<divisions {
+            for col in 0..<divisions {
+                let u0 = CGFloat(row) / CGFloat(divisions), u1 = CGFloat(row + 1) / CGFloat(divisions)
+                let v0 = CGFloat(col) / CGFloat(divisions), v1 = CGFloat(col + 1) / CGFloat(divisions)
+                let tile = polygon([g.point(u: u0, v: v0), g.point(u: u0, v: v1),
+                                    g.point(u: u1, v: v1), g.point(u: u1, v: v0)],
+                                   fill: rgb((row + col).isMultiple(of: 2) ? 0xE6B36D : 0xD49A57),
+                                   stroke: rgb(0xAB7548), width: 1)
+                tile.zPosition = 1.1; room.addChild(tile)
             }
         }
-        // The exposed edge is a dark pixel-art cutaway trim.
-        for i in 0..<18 {
-            let t = CGFloat(i) / 18
-            let x = 22 + (size.width - 44) * t
-            let y = center.y - height * 0.47 + abs(t - 0.5) * height * 0.95
-            let block = SKShapeNode(rectOf: CGSize(width: 8, height: 4))
-            block.position = CGPoint(x: x, y: y)
-            block.fillColor = rgb(i.isMultiple(of: 2) ? 0x54302A : 0x75412E)
-            block.strokeColor = .clear
-            block.zPosition = 2
-            room.addChild(block)
-        }
+        let frontEdge = polygon([g.left, g.front, CGPoint(x: g.front.x, y: g.front.y - 8), CGPoint(x: g.left.x, y: g.left.y - 8)],
+                                fill: rgb(0x60382D), stroke: .clear, width: 0)
+        let rightEdge = polygon([g.front, g.right, CGPoint(x: g.right.x, y: g.right.y - 8), CGPoint(x: g.front.x, y: g.front.y - 8)],
+                                fill: rgb(0x754332), stroke: .clear, width: 0)
+        frontEdge.zPosition = 1.2; rightEdge.zPosition = 1.2
+        room.addChild(frontEdge); room.addChild(rightEdge)
     }
 
     private func drawDecor() {
-        // Soft pools from the left-side windows keep the room warm while remaining subtle.
-        for index in 0..<3 {
-            let t = CGFloat(index)
-            let startX = size.width * (0.13 + t * 0.10)
-            let startY = size.height * (0.47 + t * 0.045)
+        let g = RoomGeometry(size), scale = g.furnitureScale
+        for t in [CGFloat(0.24), CGFloat(0.55)] {
+            let origin = interpolate(g.left, g.back, t)
             let beam = polygon([
-                CGPoint(x: startX, y: startY),
-                CGPoint(x: startX + size.width * 0.045, y: startY - size.height * 0.015),
-                CGPoint(x: startX + size.width * 0.20, y: startY - size.height * 0.19),
-                CGPoint(x: startX + size.width * 0.15, y: startY - size.height * 0.17)
-            ], fill: rgb(0xFFE19A).withAlphaComponent(0.07), stroke: .clear, width: 0)
-            beam.zPosition = 2.4
-            room.addChild(beam)
-            beam.run(.repeatForever(.sequence([.fadeAlpha(to: 0.035, duration: 2.8), .fadeAlpha(to: 0.07, duration: 3.2)])))
+                CGPoint(x: origin.x, y: origin.y + g.wallHeight * 0.18),
+                CGPoint(x: origin.x + 36 * scale, y: origin.y + g.wallHeight * 0.28),
+                CGPoint(x: origin.x + 195 * scale, y: origin.y - 87 * scale),
+                CGPoint(x: origin.x + 125 * scale, y: origin.y - 112 * scale)
+            ], fill: rgb(0xFFE19A).withAlphaComponent(0.06), stroke: .clear, width: 0)
+            beam.zPosition = 2.4; room.addChild(beam)
+            beam.run(.repeatForever(.sequence([.fadeAlpha(to: 0.025, duration: 2.8), .fadeAlpha(to: 0.06, duration: 3.2)])))
         }
-        addAsset(isoPlant, at: CGPoint(x: size.width * 0.12, y: size.height * 0.34), size: CGSize(width: 72, height: 82), z: 6)
-        addAsset(isoPlant, at: CGPoint(x: size.width * 0.91, y: size.height * 0.35), size: CGSize(width: 72, height: 82), z: 6)
-        // Break-room printer makes the shared office feel like a usable space, not a diagram.
-        addAsset(isoPrinter, at: CGPoint(x: size.width * 0.29, y: size.height * 0.55), size: CGSize(width: 58, height: 58), z: 7)
+        addAsset(isoPlant, at: CGPoint(x: g.center.x - g.halfWidth * 0.74, y: g.center.y + 25 * scale),
+                 size: CGSize(width: 66 * scale, height: 75 * scale), z: 6)
+        addAsset(isoPlant, at: CGPoint(x: g.center.x + g.halfWidth * 0.74, y: g.center.y + 25 * scale),
+                 size: CGSize(width: 66 * scale, height: 75 * scale), z: 6)
+        let shelfBase = interpolate(g.back, g.right, 0.77)
+        addAsset(isoBookshelf, at: CGPoint(x: shelfBase.x - 14 * scale, y: shelfBase.y + 37 * scale),
+                 size: CGSize(width: 76 * scale, height: 90 * scale), z: 6)
     }
 
     private func drawWorkstations(animateArrivals: Bool) {
+        let g = RoomGeometry(size), scale = g.furnitureScale
         guard !records.isEmpty else {
             let empty = SKLabelNode(text: "办公室空闲 · 等待 App 启动")
             empty.fontName = "Menlo-Bold"; empty.fontSize = 13; empty.fontColor = rgb(0x5F4838)
-            empty.position = CGPoint(x: size.width / 2, y: size.height * 0.42); empty.zPosition = 40; room.addChild(empty)
+            empty.position = g.center; empty.zPosition = 40; room.addChild(empty)
             return
         }
-        let cols = min(6, max(1, Int(ceil(sqrt(Double(records.count) * 1.55)))))
-        let rows = Int(ceil(Double(records.count) / Double(cols)))
-        // Give each process a legible workstation. The old tight grid stacked labels and
-        // made the atlas furniture read as a row of tiny red blocks.
-        let spacingX = min(176, size.width * 0.15)
-        let spacingY = min(80, size.height * 0.145)
-        let origin = CGPoint(x: size.width * 0.50, y: size.height * 0.405 + CGFloat(rows - 1) * spacingY * 0.5)
+        // Four desks form one island. The facing direction changes across the central
+        // aisle, so the office reads as paired furniture rather than a repeated icon grid.
+        let visibleCount = min(records.count, 8)
+        let islandCount = Int(ceil(Double(visibleCount) / 4))
+        let islandCols = min(3, max(1, Int(ceil(sqrt(Double(islandCount) * 1.6)))))
+        let islandRows = Int(ceil(Double(islandCount) / Double(islandCols)))
+        let islandSpacingX = 270 * scale
+        let islandSpacingY = 110 * scale
+        let origin = g.center
 
-        for (index, app) in records.prefix(36).enumerated() {
-            let row = index / cols, col = index % cols
-            let x = origin.x + (CGFloat(col) - CGFloat(cols - 1) / 2) * spacingX + CGFloat(row % 2) * spacingX * 0.18
-            let y = origin.y - CGFloat(row) * spacingY
-            let shadow = SKShapeNode(ellipseOf: CGSize(width: 72, height: 18))
-            shadow.position = CGPoint(x: x, y: y - 20); shadow.fillColor = rgb(0x6D422F).withAlphaComponent(0.22); shadow.strokeColor = .clear; shadow.zPosition = 8; room.addChild(shadow)
+        for (index, app) in records.prefix(visibleCount).enumerated() {
+            let island = index / 4, seat = index % 4
+            let islandRow = island / islandCols, islandCol = island % islandCols
+            let islandX = origin.x + (CGFloat(islandCol) - CGFloat(islandCols - 1) / 2) * islandSpacingX
+            let islandY = origin.y + (CGFloat(islandRows - 1) / 2 - CGFloat(islandRow)) * islandSpacingY
+            let facingRight = seat.isMultiple(of: 2)
+            let x = islandX + (facingRight ? -80 : 80) * scale
+            let y = islandY + (seat < 2 ? 55 : -55) * scale
+            let anchors = WorkstationAnchors(center: CGPoint(x: x, y: y), facingRight: facingRight, scale: scale)
+            let depth = 10 + (size.height - y) * 0.05
+            let shadow = SKShapeNode(ellipseOf: CGSize(width: 104 * scale, height: 19 * scale))
+            shadow.position = CGPoint(x: x, y: y - 32 * scale)
+            shadow.fillColor = rgb(0x5B3428).withAlphaComponent(0.25)
+            shadow.strokeColor = .clear; shadow.zPosition = depth; room.addChild(shadow)
 
-            let anchors = WorkstationAnchors(center: CGPoint(x: x, y: y))
-            // Draw back-to-front: chair, desk shell, seated bust, then desktop items.
-            // The 2D desk asset cannot be split into a separate front panel, so the
-            // sprite is authored without exposed legs and overlaps only the desk edge.
-            addAsset(isoChair, at: anchors.chair, size: CGSize(width: 58, height: 58), z: 10)
-            drawDesk(at: anchors.desk, z: 12)
-            drawCharacter(app, at: anchors.sitter, z: 13.5, animateArrival: animateArrivals && newArrivalKeys.contains(actorKey(app)))
-            drawMonitor(at: anchors.monitor, active: app.isFrontmost)
-            addAsset(isoKeyboard, at: anchors.keyboard, size: CGSize(width: 38, height: 38), z: 16)
-            if index.isMultiple(of: 4) {
-                let lampPoint = CGPoint(x: anchors.desk.x - 28, y: anchors.desk.y + 22)
-                addGlow(at: CGPoint(x: lampPoint.x, y: lampPoint.y - 7), size: CGSize(width: 82, height: 42), color: rgb(0xF8C96C), alpha: 0.32, z: 12)
-                addAsset(isoLamp, at: lampPoint, size: CGSize(width: 44, height: 44), z: 17)
+            addAsset(isoChair, at: anchors.chair, size: CGSize(width: 62 * scale, height: 62 * scale), z: depth + 1, flipX: !facingRight)
+            drawDesk(at: anchors.desk, z: depth + 2, flipX: !facingRight, scale: scale)
+            drawCharacter(app, at: anchors.sitter, z: depth + 3.5, animateArrival: animateArrivals && newArrivalKeys.contains(actorKey(app)), facingRight: facingRight, scale: scale)
+            drawMonitor(at: anchors.monitor, active: app.isFrontmost, z: depth + 5, flipX: !facingRight, scale: scale)
+            addAsset(isoKeyboard, at: anchors.keyboard, size: CGSize(width: 40 * scale, height: 40 * scale), z: depth + 5.5, flipX: !facingRight)
+            drawDesktopDetails(at: anchors.desk, facingRight: facingRight, variant: index, z: depth + 5, scale: scale)
+            if seat == 0 || (island == islandCount - 1 && seat == 2) {
+                let lampPoint = CGPoint(x: anchors.desk.x + 34 * scale, y: anchors.desk.y + 36 * scale)
+                addGlow(at: CGPoint(x: lampPoint.x, y: lampPoint.y - 7 * scale), size: CGSize(width: 104 * scale, height: 57 * scale), color: rgb(0xF8C96C), alpha: 0.28, z: depth + 4)
+                addAsset(isoLamp, at: lampPoint, size: CGSize(width: 45 * scale, height: 45 * scale), z: depth + 6)
             }
-            drawAppLabel(app, at: CGPoint(x: x, y: y + 59), z: 30)
+            drawAppLabel(app, at: CGPoint(x: x, y: y + (seat < 2 ? 72 : -65) * scale), z: 80, scale: scale)
         }
-        if records.count > 36 {
-            let more = SKLabelNode(text: "+\(records.count - 36) 更多 App")
-            more.fontName = "Menlo-Bold"; more.fontSize = 10; more.fontColor = rgb(0x6B4A38)
-            more.position = CGPoint(x: size.width - 82, y: 20); more.zPosition = 40; room.addChild(more)
+        if records.count > visibleCount {
+            let more = SKLabelNode(text: "+\(records.count - visibleCount) App · 见下方列表")
+            more.fontName = "Menlo-Bold"; more.fontSize = 10; more.fontColor = rgb(0xF1D6A7)
+            more.horizontalAlignmentMode = .right
+            more.position = CGPoint(x: size.width - 17, y: size.height - 43)
+            more.zPosition = 100; room.addChild(more)
         }
     }
 
-    private func drawCharacter(_ app: ProcessRecord, at point: CGPoint, z: CGFloat, animateArrival: Bool) {
+    private func drawCharacter(_ app: ProcessRecord, at point: CGPoint, z: CGFloat, animateArrival: Bool, facingRight: Bool, scale: CGFloat) {
         let key = actorKey(app)
         let characterIndex = stableIndex(for: key, count: characterSheets.count)
-        let workFrames = seatedFrames(characterIndex: characterIndex)
+        let workFrames = SeatedCharacterArt.frames(variant: characterIndex, facingRight: facingRight)
         let workFrame = workFrames[0]
-        let actor = SKSpriteNode(texture: workFrame, size: CGSize(width: 48, height: 48))
+        let actor = SKSpriteNode(texture: workFrame, size: CGSize(width: 56 * scale, height: 56 * scale))
         actor.position = point
         actor.zPosition = z
         actor.texture?.filteringMode = .nearest
@@ -251,7 +269,7 @@ final class OfficeScene: SKScene {
 
         if animateArrival {
             // A compact sit-down motion ends in the real seated typing loop.
-            actor.position = CGPoint(x: point.x, y: point.y + 12)
+            actor.position = CGPoint(x: point.x, y: point.y + 12 * scale)
             actor.yScale = 1.12
             actor.run(.sequence([.group([.move(to: point, duration: 0.28), .scaleY(to: 1, duration: 0.28)]), .run { [weak actor] in
                 let work = SKAction.animate(with: workFrames, timePerFrame: 0.32, resize: false, restore: false)
@@ -291,68 +309,66 @@ final class OfficeScene: SKScene {
         return [0, 1, 2, 1].map { frame(in: sheet, column: $0, row: 0) }
     }
 
-    /// Four crisp 32px seated pixel frames. Pose stays anchored at the pelvis; only
-    /// forearms/hands move, so the character never appears to bob onto the tabletop.
-    private func seatedFrames(characterIndex: Int) -> [SKTexture] {
-        let shirts: [UInt32] = [0x42A56A, 0x8B65B4, 0xC66A3D, 0x4F83B8, 0xD0A23D, 0x58A6A0]
-        let hairs: [UInt32] = [0x493027, 0x332A2E, 0x73412B, 0x3C302A, 0x56372D, 0x2C2B33]
-        let shirt = rgb(shirts[characterIndex % shirts.count])
-        let hair = rgb(hairs[characterIndex % hairs.count])
-        return (0..<4).map { seatedFrame(shirt: shirt, hair: hair, typingPhase: $0) }
-    }
-
-    private func seatedFrame(shirt: SKColor, hair: SKColor, typingPhase: Int) -> SKTexture {
-        let side = 32
-        guard let context = CGContext(data: nil, width: side, height: side, bitsPerComponent: 8, bytesPerRow: side * 4,
-                                      space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else {
-            return SKTexture()
-        }
-        context.setShouldAntialias(false)
-        let outline = SKColor(red: 0.16, green: 0.13, blue: 0.16, alpha: 1)
-        let skin = SKColor(red: 0.86, green: 0.60, blue: 0.40, alpha: 1)
-        let pants = SKColor(red: 0.25, green: 0.30, blue: 0.40, alpha: 1)
-        func block(_ x: Int, _ y: Int, _ w: Int, _ h: Int, _ color: SKColor) {
-            context.setFillColor(color.cgColor)
-            context.fill(CGRect(x: x, y: y, width: w, height: h))
-        }
-        // Crop the sitter at the desk: chair supports the hidden pelvis, with no
-        // standing legs that could read as feet placed on the tabletop.
-        block(8, 7, 13, 4, outline); block(9, 8, 11, 2, pants)
-        block(8, 9, 14, 12, outline); block(9, 10, 12, 10, shirt)
-        block(9, 17, 12, 2, rgb(0xE8B46E))
-        // Head turned toward the monitor at screen-right, with a small visible profile.
-        block(10, 19, 12, 11, outline); block(11, 20, 10, 9, skin)
-        block(10, 25, 12, 5, hair); block(11, 23, 10, 3, hair)
-        block(20, 22, 2, 2, skin) // nose/profile
-        block(18, 24, 1, 1, outline) // eye
-        // Upper arms angle forward. The wrists reach toward the keyboard anchor.
-        block(7, 14, 5, 6, outline); block(8, 15, 4, 4, shirt)
-        block(18, 14, 6, 6, outline); block(19, 15, 4, 4, shirt)
-        block(11, 14, 4, 4, outline); block(12, 15, 3, 3, skin)
-        block(22, 13 + (typingPhase.isMultiple(of: 2) ? 1 : 0), 6, 4, outline)
-        block(23, 14 + (typingPhase.isMultiple(of: 2) ? 1 : 0), 4, 2, skin)
-        block(16, 14 + (typingPhase.isMultiple(of: 2) ? 1 : 0), 5, 3, outline)
-        block(17, 15 + (typingPhase.isMultiple(of: 2) ? 1 : 0), 4, 1, skin)
-        guard let image = context.makeImage() else { return SKTexture() }
-        let texture = SKTexture(cgImage: image)
-        texture.filteringMode = .nearest
-        texture.usesMipmaps = false
-        return texture
-    }
-
-    private func drawMonitor(at point: CGPoint, active: Bool) {
-        addGlow(at: CGPoint(x: point.x, y: point.y + 4), size: CGSize(width: 76, height: 42), color: rgb(active ? 0x72BFEA : 0xA9C5D0), alpha: active ? 0.38 : 0.10, z: 14)
-        addAsset(isoMonitor, at: point, size: CGSize(width: 54, height: 54), z: 17)
-        let status = SKShapeNode(ellipseOf: CGSize(width: 4, height: 4))
-        status.position = CGPoint(x: point.x + 15, y: point.y + 8)
+    private func drawMonitor(at point: CGPoint, active: Bool, z: CGFloat, flipX: Bool, scale: CGFloat) {
+        addGlow(at: CGPoint(x: point.x, y: point.y + 4 * scale), size: CGSize(width: 76 * scale, height: 42 * scale), color: rgb(active ? 0x72BFEA : 0xA9C5D0), alpha: active ? 0.38 : 0.10, z: z - 1)
+        addAsset(isoMonitor, at: point, size: CGSize(width: 55 * scale, height: 55 * scale), z: z, flipX: flipX)
+        let status = SKShapeNode(ellipseOf: CGSize(width: 4 * scale, height: 4 * scale))
+        status.position = CGPoint(x: point.x + (flipX ? -17 : 17) * scale, y: point.y + 8 * scale)
         status.fillColor = rgb(active ? 0xA8E28B : 0x627B74)
         status.strokeColor = .clear
-        status.zPosition = 18
+        status.zPosition = z + 1
         room.addChild(status)
     }
 
-    private func drawDesk(at point: CGPoint, z: CGFloat) {
-        addAsset(isoDesk, at: point, size: CGSize(width: 96, height: 96), z: z)
+    private func drawDesk(at point: CGPoint, z: CGFloat, flipX: Bool, scale: CGFloat) {
+        addAsset(isoDesk, at: point, size: CGSize(width: 115 * scale, height: 115 * scale), z: z, flipX: flipX)
+    }
+
+    private func drawDesktopDetails(at point: CGPoint, facingRight: Bool, variant: Int, z: CGFloat, scale: CGFloat) {
+        let direction: CGFloat = facingRight ? 1 : -1
+        let x = point.x - direction * 30 * scale
+        let y = point.y + 20 * scale
+        // A small stack of paper follows the isometric desktop plane.
+        for layer in 0..<3 {
+            let offset = CGFloat(layer) * 2 * scale
+            let sheet = polygon([
+                CGPoint(x: x - 12 * scale, y: y + offset), CGPoint(x: x + 2 * scale, y: y + 6 * scale + offset),
+                CGPoint(x: x + 14 * scale, y: y + offset), CGPoint(x: x, y: y - 6 * scale + offset)
+            ], fill: rgb(layer == 2 ? 0xFFF2D1 : 0xD6BD91), stroke: rgb(0x8A6746), width: 1)
+            sheet.zPosition = z + CGFloat(layer) * 0.03
+            room.addChild(sheet)
+        }
+        let ink = SKShapeNode(rectOf: CGSize(width: 8 * scale, height: max(1, scale)))
+        ink.position = CGPoint(x: x, y: y + 4 * scale); ink.zRotation = -.pi / 8
+        ink.fillColor = rgb(0x7F7565); ink.strokeColor = .clear; ink.zPosition = z + 0.2; room.addChild(ink)
+
+        let bookX = point.x - direction * 38 * scale
+        let bookY = point.y + 35 * scale
+        for layer in 0..<2 {
+            let offset = CGFloat(layer) * 5 * scale
+            let cover = polygon([
+                CGPoint(x: bookX - 10 * scale, y: bookY + offset), CGPoint(x: bookX + 1 * scale, y: bookY + 5 * scale + offset),
+                CGPoint(x: bookX + 11 * scale, y: bookY + offset), CGPoint(x: bookX, y: bookY - 5 * scale + offset)
+            ], fill: rgb((variant + layer).isMultiple(of: 2) ? 0x688B72 : 0xA85E4A), stroke: rgb(0x493B35), width: 1)
+            cover.zPosition = z + 0.3 + CGFloat(layer) * 0.1; room.addChild(cover)
+        }
+
+        if variant.isMultiple(of: 3) {
+            let potX = point.x + direction * 43 * scale
+            let potY = point.y + 25 * scale
+            let pot = polygon([
+                CGPoint(x: potX - 6 * scale, y: potY), CGPoint(x: potX + 6 * scale, y: potY),
+                CGPoint(x: potX + 4 * scale, y: potY - 8 * scale), CGPoint(x: potX - 4 * scale, y: potY - 8 * scale)
+            ], fill: rgb(0xB46E4F), stroke: rgb(0x583C30), width: 1)
+            pot.zPosition = z + 0.4; room.addChild(pot)
+            for (dx, dy) in [(-5, 8), (0, 12), (5, 7), (0, 5)] {
+                let leaf = SKShapeNode(rectOf: CGSize(width: 6 * scale, height: 5 * scale))
+                leaf.position = CGPoint(x: potX + CGFloat(dx) * scale, y: potY + CGFloat(dy) * scale)
+                leaf.fillColor = rgb(dx == 0 ? 0x4F8B59 : 0x6CA367)
+                leaf.strokeColor = rgb(0x36523D); leaf.lineWidth = 1
+                leaf.isAntialiased = false; leaf.zPosition = z + 0.5; room.addChild(leaf)
+            }
+        }
     }
 
     private func deskFace(_ points: [CGPoint], fill: SKColor, z: CGFloat) -> SKShapeNode {
@@ -361,19 +377,19 @@ final class OfficeScene: SKScene {
         return face
     }
 
-    private func drawAppLabel(_ app: ProcessRecord, at point: CGPoint, z: CGFloat) {
+    private func drawAppLabel(_ app: ProcessRecord, at point: CGPoint, z: CGFloat, scale: CGFloat) {
         let label = SKLabelNode(text: String(app.name.prefix(14)))
-        label.fontName = "Menlo-Bold"; label.fontSize = 9; label.fontColor = rgb(0x342A2D)
+        label.fontName = "Menlo-Bold"; label.fontSize = max(7, 9 * scale); label.fontColor = rgb(0x342A2D)
         label.position = point; label.verticalAlignmentMode = .center; label.zPosition = z + 1
-        let width = min(120, max(48, CGFloat(app.name.count) * 5.5 + 16))
-        let card = SKShapeNode(rectOf: CGSize(width: width, height: 18), cornerRadius: 4)
+        let width = min(120 * scale, max(48 * scale, CGFloat(app.name.count) * 5.5 * scale + 16 * scale))
+        let card = SKShapeNode(rectOf: CGSize(width: width, height: 18 * scale), cornerRadius: 4 * scale)
         card.position = point; card.fillColor = rgb(app.isFrontmost ? 0xFFF1C9 : 0xF4DDAF).withAlphaComponent(0.96)
         card.strokeColor = rgb(app.isFrontmost ? 0xC98847 : 0xB8885A); card.lineWidth = 1; card.zPosition = z; room.addChild(card); room.addChild(label)
-        let department = SKShapeNode(rectOf: CGSize(width: 5, height: 11), cornerRadius: 1)
-        department.position = CGPoint(x: point.x - width / 2 + 3, y: point.y); department.fillColor = rgb(app.department.colorHex); department.strokeColor = .clear; department.zPosition = z + 2; room.addChild(department)
+        let department = SKShapeNode(rectOf: CGSize(width: 5 * scale, height: 11 * scale), cornerRadius: 1)
+        department.position = CGPoint(x: point.x - width / 2 + 3 * scale, y: point.y); department.fillColor = rgb(app.department.colorHex); department.strokeColor = .clear; department.zPosition = z + 2; room.addChild(department)
         if app.isFrontmost {
             let bubble = SKLabelNode(text: "前台")
-            bubble.fontName = "Menlo-Bold"; bubble.fontSize = 7; bubble.fontColor = rgb(0x855324); bubble.position = CGPoint(x: point.x, y: point.y + 14); bubble.zPosition = z + 2; room.addChild(bubble)
+            bubble.fontName = "Menlo-Bold"; bubble.fontSize = max(6, 7 * scale); bubble.fontColor = rgb(0x855324); bubble.position = CGPoint(x: point.x, y: point.y + 14 * scale); bubble.zPosition = z + 2; room.addChild(bubble)
         }
     }
 
@@ -381,9 +397,10 @@ final class OfficeScene: SKScene {
         addAsset(isoBookshelf, at: CGPoint(x: point.x + width / 2, y: point.y + height / 2), size: CGSize(width: width, height: height), z: 7)
     }
 
-    private func addAsset(_ texture: SKTexture, at point: CGPoint, size: CGSize, z: CGFloat) {
+    private func addAsset(_ texture: SKTexture, at point: CGPoint, size: CGSize, z: CGFloat, flipX: Bool = false) {
         let sprite = SKSpriteNode(texture: texture, size: size)
         sprite.position = point
+        sprite.xScale = flipX ? -1 : 1
         sprite.zPosition = z
         sprite.texture?.filteringMode = .nearest
         room.addChild(sprite)
@@ -455,6 +472,10 @@ final class OfficeScene: SKScene {
     private func polygon(_ points: [CGPoint], fill: SKColor, stroke: SKColor, width: CGFloat) -> SKShapeNode {
         let path = CGMutablePath(); path.move(to: points[0]); points.dropFirst().forEach { path.addLine(to: $0) }; path.closeSubpath()
         let node = SKShapeNode(path: path); node.fillColor = fill; node.strokeColor = stroke; node.lineWidth = width; node.isAntialiased = false; node.zPosition = 0; return node
+    }
+
+    private func interpolate(_ a: CGPoint, _ b: CGPoint, _ t: CGFloat) -> CGPoint {
+        CGPoint(x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t)
     }
 
     private func diamond(width: CGFloat, height: CGFloat) -> CGPath {

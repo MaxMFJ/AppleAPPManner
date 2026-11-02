@@ -12,6 +12,7 @@
 		A10000000000000000000004 /* ProcessMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000004 /* ProcessMonitor.swift */; };
 		A10000000000000000000005 /* WorkspaceSync.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000005 /* WorkspaceSync.swift */; };
 		A10000000000000000000006 /* main.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000006 /* main.swift */; };
+		A1000000000000000000000B /* SeatedCharacterArt.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000000000000000000000B /* SeatedCharacterArt.swift */; };
 		A10000000000000000000007 /* ModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000007 /* ModelTests.swift */; };
 		A10000000000000000000009 /* Models.swift in Tests */ = {isa = PBXBuildFile; fileRef = A20000000000000000000002 /* Models.swift */; };
 		000000000000000000000010 /* char_0.png in Resources */ = {isa = PBXBuildFile; fileRef = 000000000000000000000020 /* char_0.png */; };
@@ -42,6 +43,7 @@
 		A20000000000000000000004 /* ProcessMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProcessMonitor.swift; sourceTree = "<group>"; };
 		A20000000000000000000005 /* WorkspaceSync.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkspaceSync.swift; sourceTree = "<group>"; };
 		A20000000000000000000006 /* main.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = main.swift; sourceTree = "<group>"; };
+		A2000000000000000000000B /* SeatedCharacterArt.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SeatedCharacterArt.swift; sourceTree = "<group>"; };
 		A20000000000000000000007 /* ModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelTests.swift; sourceTree = "<group>"; };
 		A20000000000000000000008 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		A20000000000000000000009 /* PixelWorkspace.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = PixelWorkspace.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -69,7 +71,7 @@
 
 /* Begin PBXGroup section */
 		A80000000000000000000001 = {isa = PBXGroup; children = (A80000000000000000000002 /* Sources */, A80000000000000000000003 /* Tests */, A80000000000000000000004 /* Supporting Files */, A80000000000000000000005 /* Products */,); sourceTree = "<group>"; };
-		A80000000000000000000002 /* Sources */ = {isa = PBXGroup; path = Sources/PixelWorkspace; sourceTree = "<group>"; children = (A20000000000000000000001 /* AppMain.swift */, A20000000000000000000002 /* Models.swift */, A20000000000000000000003 /* OfficeScene.swift */, A20000000000000000000004 /* ProcessMonitor.swift */, A20000000000000000000005 /* WorkspaceSync.swift */, A20000000000000000000006 /* main.swift */,); };
+		A80000000000000000000002 /* Sources */ = {isa = PBXGroup; path = Sources/PixelWorkspace; sourceTree = "<group>"; children = (A20000000000000000000001 /* AppMain.swift */, A20000000000000000000002 /* Models.swift */, A20000000000000000000003 /* OfficeScene.swift */, A20000000000000000000004 /* ProcessMonitor.swift */, A20000000000000000000005 /* WorkspaceSync.swift */, A20000000000000000000006 /* main.swift */, A2000000000000000000000B /* SeatedCharacterArt.swift */,); };
 		A80000000000000000000003 /* Tests */ = {isa = PBXGroup; path = Tests/PixelWorkspaceTests; sourceTree = "<group>"; children = (A20000000000000000000007 /* ModelTests.swift */,); };
 		A80000000000000000000004 /* Supporting Files */ = {isa = PBXGroup; children = (A20000000000000000000008 /* Info.plist */, A80000000000000000000006 /* Art Resources */,); };
 		A80000000000000000000005 /* Products */ = {isa = PBXGroup; name = Products; sourceTree = "<group>"; children = (A20000000000000000000009 /* PixelWorkspace.app */, A2000000000000000000000A /* PixelWorkspaceTests.xctest */,); };
@@ -91,7 +93,7 @@
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
-		A70000000000000000000003 /* Sources */ = {isa = PBXSourcesBuildPhase; buildActionMask = 2147483647; files = (A10000000000000000000001 /* AppMain.swift in Sources */, A10000000000000000000002 /* Models.swift in Sources */, A10000000000000000000003 /* OfficeScene.swift in Sources */, A10000000000000000000004 /* ProcessMonitor.swift in Sources */, A10000000000000000000005 /* WorkspaceSync.swift in Sources */, A10000000000000000000006 /* main.swift in Sources */,); runOnlyForDeploymentPostprocessing = 0; };
+		A70000000000000000000003 /* Sources */ = {isa = PBXSourcesBuildPhase; buildActionMask = 2147483647; files = (A10000000000000000000001 /* AppMain.swift in Sources */, A10000000000000000000002 /* Models.swift in Sources */, A10000000000000000000003 /* OfficeScene.swift in Sources */, A10000000000000000000004 /* ProcessMonitor.swift in Sources */, A10000000000000000000005 /* WorkspaceSync.swift in Sources */, A10000000000000000000006 /* main.swift in Sources */, A1000000000000000000000B /* SeatedCharacterArt.swift in Sources */,); runOnlyForDeploymentPostprocessing = 0; };
 		A70000000000000000000004 /* Sources */ = {isa = PBXSourcesBuildPhase; buildActionMask = 2147483647; files = (A10000000000000000000007 /* ModelTests.swift in Sources */, A10000000000000000000009 /* Models.swift in Tests */,); runOnlyForDeploymentPostprocessing = 0; };
 /* End PBXSourcesBuildPhase section */
 

@@ -2,7 +2,7 @@
 
 Native macOS MVP for a low-resource, 45° isometric office view of running apps. Each character represents an observed running app process; the app does not infer what a process is doing. Department assignment is a transparent bundle-ID/name rule with a persistent manual override.
 
-The office view uses locally installed Antahonist isometric furniture, CC0 character sheets, and SpriteKit lighting. Sources and licenses are listed in [`docs/asset-credits.md`](docs/asset-credits.md).
+The office view uses locally installed Antahonist isometric furniture, code-drawn seated characters, CC0 walking character sheets, and SpriteKit lighting. Sources and licenses are listed in [`docs/asset-credits.md`](docs/asset-credits.md). Desks are grouped into four-seat islands with opposing orientations, larger work surfaces, papers, books, plants, and lamps. To keep the scene legible, it displays up to eight workstations at once; every observed app remains available in the list below the scene.
 
 ## Run
 
